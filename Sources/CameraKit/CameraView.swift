@@ -19,6 +19,9 @@ public struct CameraView<Content: View>: View {
     /// Size of the capture button
     var captureButtonSize: CGFloat
     
+    /// Whether to fix the preview orientation
+    var fixedPreviewOrientation: Bool
+    
     /// Camera service
     @StateObject private var cameraService = CameraService()
     
@@ -39,18 +42,21 @@ public struct CameraView<Content: View>: View {
     ///   - onError: Optional callback when an error occurs
     ///   - showOrientationArrow: Whether to show the orientation arrow (default: true)
     ///   - captureButtonSize: Size of the capture button (default: 70)
+    ///   - fixedPreviewOrientation: Whether to fix the preview orientation (default: false)
     ///   - overlayContent: Optional overlay content
     public init(
         onImageCaptured: @escaping (UIImage) -> Void,
         onError: ((Error) -> Void)? = nil,
         showOrientationArrow: Bool = true,
         captureButtonSize: CGFloat = 70,
+        fixedPreviewOrientation: Bool = false,
         overlayContent: (() -> Content)? = nil
     ) {
         self.onImageCaptured = onImageCaptured
         self.onError = onError
         self.showOrientationArrow = showOrientationArrow
         self.captureButtonSize = captureButtonSize
+        self.fixedPreviewOrientation = fixedPreviewOrientation
         self.overlayContent = overlayContent
     }
     
@@ -64,7 +70,8 @@ public struct CameraView<Content: View>: View {
                 if cameraService.isSessionRunning.value {
                     CameraPreviewView(
                         session: cameraService.captureSession,
-                        orientation: $orientation
+                        orientation: $orientation,
+                        fixedOrientation: fixedPreviewOrientation
                     )
                     .edgesIgnoringSafeArea(.all)
                 }
@@ -200,13 +207,15 @@ public extension CameraView where Content == EmptyView {
         onImageCaptured: @escaping (UIImage) -> Void,
         onError: ((Error) -> Void)? = nil,
         showOrientationArrow: Bool = true,
-        captureButtonSize: CGFloat = 70
+        captureButtonSize: CGFloat = 70,
+        fixedPreviewOrientation: Bool = false
     ) {
         self.init(
             onImageCaptured: onImageCaptured,
             onError: onError,
             showOrientationArrow: showOrientationArrow,
             captureButtonSize: captureButtonSize,
+            fixedPreviewOrientation: fixedPreviewOrientation,
             overlayContent: nil
         )
     }

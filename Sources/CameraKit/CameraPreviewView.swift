@@ -9,13 +9,28 @@ public struct CameraPreviewView: UIViewRepresentable {
     /// The current device orientation
     @Binding public var orientation: UIDeviceOrientation
     
+    /// Whether to fix the preview orientation regardless of device rotation
+    public let fixedOrientation: Bool
+    
+    /// The orientation to use when fixed mode is enabled
+    public let fixedOrientationValue: AVCaptureVideoOrientation
+    
     /// Creates a new camera preview view
     /// - Parameters:
     ///   - session: The AVCaptureSession to display
     ///   - orientation: Binding to the current device orientation
-    public init(session: AVCaptureSession, orientation: Binding<UIDeviceOrientation>) {
+    ///   - fixedOrientation: Whether to keep orientation fixed regardless of device rotation
+    ///   - fixedOrientationValue: The orientation to use when fixed (default: .portrait)
+    public init(
+        session: AVCaptureSession, 
+        orientation: Binding<UIDeviceOrientation>,
+        fixedOrientation: Bool = false,
+        fixedOrientationValue: AVCaptureVideoOrientation = .portrait
+    ) {
         self.session = session
         self._orientation = orientation
+        self.fixedOrientation = fixedOrientation
+        self.fixedOrientationValue = fixedOrientationValue
     }
     
     /// Creates a coordinator to manage the preview layer
@@ -41,7 +56,15 @@ public struct CameraPreviewView: UIViewRepresentable {
         // Create preview layer
         let previewLayer = AVCaptureVideoPreviewLayer(session: session)
         previewLayer.videoGravity = .resizeAspectFill
-        previewLayer.connection?.videoOrientation = orientation.toAVCaptureVideoOrientation()
+        
+        // Set the initial orientation
+        if previewLayer.connection?.isVideoOrientationSupported == true {
+            if fixedOrientation {
+                previewLayer.connection?.videoOrientation = fixedOrientationValue
+            } else {
+                previewLayer.connection?.videoOrientation = orientation.toAVCaptureVideoOrientation()
+            }
+        }
         
         // Store in coordinator for future updates
         context.coordinator.previewLayer = previewLayer
@@ -64,8 +87,8 @@ public struct CameraPreviewView: UIViewRepresentable {
         // Update frame to fill the entire view
         previewLayer.frame = uiView.bounds
         
-        // Update orientation
-        if previewLayer.connection?.isVideoOrientationSupported == true {
+        // Only update orientation if not fixed
+        if !fixedOrientation, previewLayer.connection?.isVideoOrientationSupported == true {
             previewLayer.connection?.videoOrientation = orientation.toAVCaptureVideoOrientation()
         }
         
