@@ -85,24 +85,27 @@ public struct CameraView<Content: View>: View {
             }
         }
         .task {
+            print("CameraView - task started")
             await setupCamera()
         }
         .onAppear {
+            print("CameraView - onAppear called")
             setupSubscriptions()
             
             // Force portrait orientation
-            UIDevice.current.setValue(UIInterfaceOrientation.portrait.rawValue, forKey: "orientation")
+            //UIDevice.current.setValue(UIInterfaceOrientation.portrait.rawValue, forKey: "orientation")
             
             // Add orientation lock for iOS 16+
-            if #available(iOS 16.0, *) {
-                UIApplication.shared.connectedScenes.forEach { scene in
-                    if let windowScene = scene as? UIWindowScene {
-                        windowScene.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait))
-                    }
-                }
-            }
+            //if #available(iOS 16.0, *) {
+            //    UIApplication.shared.connectedScenes.forEach { scene in
+            //        if let windowScene = scene as? UIWindowScene {
+            //            windowScene.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait))
+            //        }
+            //    }
+            //}
         }
         .onDisappear {
+            print("CameraView - onDisappear called")
             cameraService.stopSession()
             cancellables.removeAll()
         }
@@ -115,7 +118,9 @@ public struct CameraView<Content: View>: View {
     // MARK: - Setup
     
     private func setupCamera() async {
+        print("CameraView - Setting up camera")
         let authorized = await cameraService.checkPermissions()
+        print("CameraView - Camera permissions authorized: \(authorized)")
         
         if authorized {
             do {

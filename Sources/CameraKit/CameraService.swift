@@ -87,7 +87,8 @@ public class CameraService: NSObject, CameraServiceProtocol, ObservableObject {
     
     @objc private func orientationChanged() {
         let newOrientation = UIDevice.current.orientation
-        
+        print("CameraService - Orientation changed to: \(newOrientation.rawValue)")
+            
         // Only update for valid orientations (not face up/down)
         if newOrientation != .faceUp && newOrientation != .faceDown && newOrientation != .unknown {
             DispatchQueue.main.async { [weak self] in
@@ -171,8 +172,12 @@ public class CameraService: NSObject, CameraServiceProtocol, ObservableObject {
     // MARK: - Session Control
     
     public func startSession() {
-        guard !captureSession.isRunning else { return }
+        guard !captureSession.isRunning else { 
+            print("CameraService - Session already running")
+            return 
+        }
         
+        print("CameraService - Starting session")
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             self?.captureSession.startRunning()
             DispatchQueue.main.async {
