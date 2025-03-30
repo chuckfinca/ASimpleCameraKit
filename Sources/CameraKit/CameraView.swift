@@ -19,9 +19,6 @@ public struct CameraView<Content: View>: View {
     /// Size of the capture button
     var captureButtonSize: CGFloat
     
-    /// Whether to fix the preview orientation
-    var fixedPreviewOrientation: Bool
-    
     /// Camera service
     @StateObject private var cameraService = CameraService()
     
@@ -42,21 +39,18 @@ public struct CameraView<Content: View>: View {
     ///   - onError: Optional callback when an error occurs
     ///   - showOrientationArrow: Whether to show the orientation arrow (default: true)
     ///   - captureButtonSize: Size of the capture button (default: 70)
-    ///   - fixedPreviewOrientation: Whether to fix the preview orientation (default: false)
     ///   - overlayContent: Optional overlay content
     public init(
         onImageCaptured: @escaping (UIImage) -> Void,
         onError: ((Error) -> Void)? = nil,
         showOrientationArrow: Bool = true,
         captureButtonSize: CGFloat = 70,
-        fixedPreviewOrientation: Bool = false,
         overlayContent: (() -> Content)? = nil
     ) {
         self.onImageCaptured = onImageCaptured
         self.onError = onError
         self.showOrientationArrow = showOrientationArrow
         self.captureButtonSize = captureButtonSize
-        self.fixedPreviewOrientation = fixedPreviewOrientation
         self.overlayContent = overlayContent
     }
     
@@ -66,15 +60,15 @@ public struct CameraView<Content: View>: View {
                 // Black background
                 Color.black.edgesIgnoringSafeArea(.all)
                 
-                // Camera preview - always full screen
+                // Camera preview - simplified approach that doesn't rotate
                 if cameraService.isSessionRunning.value {
-                    CameraPreviewView(
-                        session: cameraService.captureSession,
-                        orientation: $orientation,
-                        fixedOrientation: fixedPreviewOrientation
-                    )
+                    ZStack {
+                        CameraPreview(session: cameraService.captureSession)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .edgesIgnoringSafeArea(.all)
                 }
+
                 
                 // UI Overlay
                 cameraUIOverlay(geometry: geometry)
@@ -95,6 +89,18 @@ public struct CameraView<Content: View>: View {
         }
         .onAppear {
             setupSubscriptions()
+            
+            // Force portrait orientation
+            UIDevice.current.setValue(UIInterfaceOrientation.portrait.rawValue, forKey: "orientation")
+            
+            // Add orientation lock for iOS 16+
+            if #available(iOS 16.0, *) {
+                UIApplication.shared.connectedScenes.forEach { scene in
+                    if let windowScene = scene as? UIWindowScene {
+                        windowScene.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait))
+                    }
+                }
+            }
         }
         .onDisappear {
             cameraService.stopSession()
@@ -114,7 +120,19 @@ public struct CameraView<Content: View>: View {
         if authorized {
             do {
                 try await cameraService.setupCaptureSession()
-                cameraService.startSession()
+                
+                // Explicitly start session on background thread and update UI on main thread
+                await MainActor.run {
+                    print("Starting camera session")
+                    // Start on background thread to avoid UI freezing
+                    Task.detached(priority: .userInitiated) {
+                        self.cameraService.startSession()
+                        // Notify main thread when done
+                        await MainActor.run {
+                            print("Camera session started")
+                        }
+                    }
+                }
             } catch {
                 handleError(error)
             }
@@ -207,15 +225,13 @@ public extension CameraView where Content == EmptyView {
         onImageCaptured: @escaping (UIImage) -> Void,
         onError: ((Error) -> Void)? = nil,
         showOrientationArrow: Bool = true,
-        captureButtonSize: CGFloat = 70,
-        fixedPreviewOrientation: Bool = false
+        captureButtonSize: CGFloat = 70
     ) {
         self.init(
             onImageCaptured: onImageCaptured,
             onError: onError,
             showOrientationArrow: showOrientationArrow,
             captureButtonSize: captureButtonSize,
-            fixedPreviewOrientation: fixedPreviewOrientation,
             overlayContent: nil
         )
     }
