@@ -87,26 +87,38 @@ class CameraPreviewView: UIView {
     }
     
     // This updates the video orientation based on the current device orientation
+    // Add this property to track the previous valid orientation
+    private var lastValidOrientation: UIDeviceOrientation = .portrait
+    
     func updateVideoOrientation() {
         guard let connection = videoPreviewLayer.connection, connection.isVideoOrientationSupported else {
             return
         }
         
-        // Get current device orientation and convert to video orientation
+        // Get current device orientation
         let deviceOrientation = UIDevice.current.orientation
         
-        // Only update for valid orientations
-        if deviceOrientation == .unknown || deviceOrientation == .faceUp || deviceOrientation == .faceDown {
-            return
+        // Determine which orientation to use
+        let orientationToUse: UIDeviceOrientation
+        
+        if deviceOrientation == .unknown || deviceOrientation == .faceUp || 
+           deviceOrientation == .faceDown {
+            // Use the last valid orientation for these invalid cases
+            orientationToUse = lastValidOrientation
+        } else if deviceOrientation == .portraitUpsideDown {
+            // For upside down, also use the last valid orientation
+            orientationToUse = lastValidOrientation
+        } else {
+            // This is a valid orientation - update our tracker and use it
+            lastValidOrientation = deviceOrientation
+            orientationToUse = deviceOrientation
         }
         
         // Convert device orientation to video orientation
         let videoOrientation: AVCaptureVideoOrientation
-        switch deviceOrientation {
+        switch orientationToUse {
         case .portrait:
             videoOrientation = .portrait
-        case .portraitUpsideDown:
-            videoOrientation = .portraitUpsideDown
         case .landscapeLeft:
             videoOrientation = .landscapeRight  // Note: This is reversed
         case .landscapeRight:
