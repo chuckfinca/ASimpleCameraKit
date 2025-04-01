@@ -19,17 +19,8 @@ public struct CameraView<Content: View>: View {
     /// Size of the capture button
     var captureButtonSize: CGFloat
     
-    /// Camera service
-    @StateObject private var cameraService = CameraService()
-    
-    /// View state
-    @State private var orientation: UIDeviceOrientation = .portrait
-    @State private var isCapturing = false
-    @State private var showError = false
-    @State private var currentError: Error?
-    
-    /// View model subscription
-    @State private var cancellables = Set<AnyCancellable>()
+    /// View model for camera logic
+    @StateObject private var viewModel = CameraViewModel()
     
     // MARK: - Initialization
     
@@ -60,15 +51,14 @@ public struct CameraView<Content: View>: View {
                 // Black background
                 Color.black.edgesIgnoringSafeArea(.all)
                 
-                // Camera preview - simplified approach that doesn't rotate
-                if cameraService.isSessionRunning.value {
+                // Camera preview - use viewModel.isSessionRunning
+                if viewModel.isSessionRunning {
                     ZStack {
-                        CameraPreview(session: cameraService.captureSession)
+                        CameraPreview(session: viewModel.captureSession)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .edgesIgnoringSafeArea(.all)
                 }
-
                 
                 // UI Overlay
                 cameraUIOverlay(geometry: geometry)
@@ -79,7 +69,7 @@ public struct CameraView<Content: View>: View {
                 }
                 
                 // Loading overlay
-                if isCapturing {
+                if viewModel.isCapturing {
                     LoadingOverlay(message: "Capturing...")
                 }
             }
@@ -90,113 +80,57 @@ public struct CameraView<Content: View>: View {
         }
         .onAppear {
             print("CameraView - onAppear called")
-            setupSubscriptions()
-            
-            // Force portrait orientation
-            //UIDevice.current.setValue(UIInterfaceOrientation.portrait.rawValue, forKey: "orientation")
-            
-            // Add orientation lock for iOS 16+
-            //if #available(iOS 16.0, *) {
-            //    UIApplication.shared.connectedScenes.forEach { scene in
-            //        if let windowScene = scene as? UIWindowScene {
-            //            windowScene.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait))
-            //        }
-            //    }
-            //}
+            viewModel.onError = onError
         }
         .onDisappear {
             print("CameraView - onDisappear called")
-            cameraService.stopSession()
-            cancellables.removeAll()
+            // Use Task to call the async method
+            Task {
+                await viewModel.stopSession()
+            }
         }
         .errorAlert(
-            isPresented: $showError,
-            error: currentError
+            isPresented: $viewModel.showError,
+            error: viewModel.currentError,
+            retryAction: {
+                print("CameraView - Retrying camera setup")
+                Task {
+                    await setupCamera()
+                }
+            }
         )
+        // Observe capturedImage updates
+        .onChange(of: viewModel.capturedImage) { newImage in
+            if let image = newImage {
+                onImageCaptured(image)
+                // Clear the captured image to prepare for the next capture
+                viewModel.capturedImage = nil
+            }
+        }
     }
     
     // MARK: - Setup
     
     private func setupCamera() async {
         print("CameraView - Setting up camera")
-        let authorized = await cameraService.checkPermissions()
+        let authorized = await viewModel.checkPermissions()
         print("CameraView - Camera permissions authorized: \(authorized)")
         
         if authorized {
             do {
-                try await cameraService.setupCaptureSession()
+                // Step 1: Setup capture session
+                try await viewModel.setupCaptureSession()
                 
-                // Explicitly start session on background thread and update UI on main thread
-                await MainActor.run {
-                    print("Starting camera session")
-                    // Start on background thread to avoid UI freezing
-                    Task.detached(priority: .userInitiated) {
-                        self.cameraService.startSession()
-                        // Notify main thread when done
-                        await MainActor.run {
-                            print("Camera session started")
-                        }
-                    }
-                }
+                // Step 2: Start session - simplified to a single async call
+                print("Starting camera session")
+                await viewModel.startSession()
+                print("Camera session started")
             } catch {
-                handleError(error)
+                viewModel.currentError = error
+                viewModel.showError = true
+                onError?(error)
             }
         }
-    }
-    
-    private func setupSubscriptions() {
-        // Get initial orientation
-        orientation = cameraService.deviceOrientation.value
-        
-        // Subscribe to orientation changes
-        cameraService.deviceOrientation
-            .receive(on: RunLoop.main)
-            .sink { newOrientation in
-                orientation = newOrientation
-            }
-            .store(in: &cancellables)
-        
-        // Subscribe to captured images
-        cameraService.capturedImage
-            .compactMap { $0 }
-            .receive(on: RunLoop.main)
-            .sink { image in
-                isCapturing = false
-                onImageCaptured(image)
-            }
-            .store(in: &cancellables)
-        
-        // Subscribe to errors
-        cameraService.error
-            .compactMap { $0 }
-            .receive(on: RunLoop.main)
-            .sink { error in
-                handleError(error)
-            }
-            .store(in: &cancellables)
-    }
-    
-    // MARK: - Actions
-    
-    private func capturePhoto() {
-        isCapturing = true
-        
-        Task {
-            do {
-                try await cameraService.capturePhoto()
-            } catch {
-                await MainActor.run {
-                    isCapturing = false
-                    handleError(error)
-                }
-            }
-        }
-    }
-    
-    private func handleError(_ error: Error) {
-        currentError = error
-        showError = true
-        onError?(error)
     }
     
     // MARK: - UI Components
@@ -204,9 +138,9 @@ public struct CameraView<Content: View>: View {
     @ViewBuilder
     private func cameraUIOverlay(geometry: GeometryProxy) -> some View {
         ZStack {
-            // Orientation arrow (if enabled)
+            // Orientation arrow (if enabled) - use viewModel.orientation
             if showOrientationArrow {
-                OrientationArrow(orientation: orientation)
+                OrientationArrow(orientation: viewModel.orientation)
             }
             
             // Capture button
@@ -214,8 +148,13 @@ public struct CameraView<Content: View>: View {
                 Spacer()
                 
                 CaptureButton(
-                    action: capturePhoto,
-                    disabled: isCapturing,
+                    action: {
+                        // Use Task to call the async method
+                        Task {
+                            await viewModel.capturePhoto()
+                        }
+                    },
+                    disabled: viewModel.isCapturing,
                     size: captureButtonSize
                 )
                 .padding(.bottom, 30)

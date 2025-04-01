@@ -28,10 +28,10 @@ public protocol CameraServiceProtocol {
     func setupCaptureSession() async throws
     
     /// Starts the capture session
-    func startSession()
+    func startSession() async
     
     /// Stops the capture session
-    func stopSession()
+    func stopSession() async
     
     /// Captures a photo
     /// - Throws: CameraError if capture fails
@@ -119,7 +119,7 @@ public class CameraService: NSObject, CameraServiceProtocol, ObservableObject {
     public func setupCaptureSession() async throws {
         // Clear session if already configured
         if captureSession.isRunning {
-            stopSession()
+            await stopSession()
         }
         
         if captureSession.inputs.isEmpty == false {
@@ -171,30 +171,37 @@ public class CameraService: NSObject, CameraServiceProtocol, ObservableObject {
     
     // MARK: - Session Control
     
-    public func startSession() {
+    public func startSession() async {
         guard !captureSession.isRunning else { 
             print("CameraService - Session already running")
             return 
         }
         
         print("CameraService - Starting session")
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            self?.captureSession.startRunning()
-            DispatchQueue.main.async {
-                self?.isSessionRunning.send(true)
+        
+        // Use a single detached task to run on background thread and wait for completion
+        await Task.detached(priority: .userInitiated) {
+            self.captureSession.startRunning()
+            
+            await MainActor.run {
+                print("CameraService - Session started, updating state")
+                self.isSessionRunning.send(true)
             }
-        }
+        }.value
     }
     
-    public func stopSession() {
+    public func stopSession() async {
         guard captureSession.isRunning else { return }
         
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            self?.captureSession.stopRunning()
-            DispatchQueue.main.async {
-                self?.isSessionRunning.send(false)
+        print("CameraService - Stopping session")
+        
+        await Task.detached(priority: .userInitiated) {
+            self.captureSession.stopRunning()
+            
+            await MainActor.run {
+                self.isSessionRunning.send(false)
             }
-        }
+        }.value
     }
     
     // MARK: - Photo Capture
