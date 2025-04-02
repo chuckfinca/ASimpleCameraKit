@@ -13,9 +13,6 @@ public struct CameraView<Content: View>: View {
     /// Optional overlay content
     var overlayContent: (() -> Content)?
     
-    /// Whether to show the orientation arrow
-    var showOrientationArrow: Bool
-    
     /// Size of the capture button
     var captureButtonSize: CGFloat
     
@@ -28,19 +25,16 @@ public struct CameraView<Content: View>: View {
     /// - Parameters:
     ///   - onImageCaptured: Callback when an image is captured
     ///   - onError: Optional callback when an error occurs
-    ///   - showOrientationArrow: Whether to show the orientation arrow (default: true)
     ///   - captureButtonSize: Size of the capture button (default: 70)
     ///   - overlayContent: Optional overlay content
     public init(
         onImageCaptured: @escaping (UIImage) -> Void,
         onError: ((Error) -> Void)? = nil,
-        showOrientationArrow: Bool = true,
         captureButtonSize: CGFloat = 70,
         overlayContent: (() -> Content)? = nil
     ) {
         self.onImageCaptured = onImageCaptured
         self.onError = onError
-        self.showOrientationArrow = showOrientationArrow
         self.captureButtonSize = captureButtonSize
         self.overlayContent = overlayContent
     }
@@ -138,10 +132,6 @@ public struct CameraView<Content: View>: View {
     @ViewBuilder
     private func cameraUIOverlay(geometry: GeometryProxy) -> some View {
         ZStack {
-            // Orientation arrow (if enabled) - use viewModel.orientation
-            if showOrientationArrow {
-                OrientationArrow(orientation: viewModel.orientation)
-            }
             
             // Capture button
             VStack {
@@ -168,13 +158,11 @@ public extension CameraView where Content == EmptyView {
     init(
         onImageCaptured: @escaping (UIImage) -> Void,
         onError: ((Error) -> Void)? = nil,
-        showOrientationArrow: Bool = true,
         captureButtonSize: CGFloat = 70
     ) {
         self.init(
             onImageCaptured: onImageCaptured,
             onError: onError,
-            showOrientationArrow: showOrientationArrow,
             captureButtonSize: captureButtonSize,
             overlayContent: nil
         )

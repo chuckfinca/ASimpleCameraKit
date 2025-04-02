@@ -31,36 +31,3 @@ public extension UIDeviceOrientation {
         }
     }
 }
-
-/// A SwiftUI view that displays an orientation indicator arrow
-public struct OrientationArrow: View {
-    public var orientation: UIDeviceOrientation
-    public var size: CGFloat = 50
-    public var color: Color = .white
-    
-    public init(orientation: UIDeviceOrientation, size: CGFloat = 50, color: Color = .white) {
-        self.orientation = orientation
-        self.size = size
-        self.color = color
-    }
-    
-    public var body: some View {
-        Image(systemName: "arrow.up.circle.fill")
-            .font(.system(size: size))
-            .foregroundColor(color)
-            .rotationEffect(rotationAngle)
-    }
-    
-    private var rotationAngle: Angle {
-        switch orientation {
-        case .portraitUpsideDown:
-            return .degrees(180)
-        case .landscapeLeft:
-            return .degrees(90)
-        case .landscapeRight:
-            return .degrees(-90)
-        default:
-            return .degrees(0)
-        }
-    }
-}
