@@ -2,7 +2,7 @@ import SwiftUI
 import AVFoundation
 import Combine
 
-// A robust camera preview that properly handles orientation and layout changes
+// A robust camera preview that properly handles orientation without rotating
 struct CameraPreview: UIViewRepresentable {
     let session: AVCaptureSession
     
@@ -23,7 +23,6 @@ struct CameraPreview: UIViewRepresentable {
         
         // Force layout update - this is critical
         DispatchQueue.main.async {
-            uiView.updateVideoOrientation()
             uiView.layoutIfNeeded()
         }
     }
@@ -32,7 +31,6 @@ struct CameraPreview: UIViewRepresentable {
 // Custom UIView subclass that properly manages the AVCaptureVideoPreviewLayer
 class CameraPreviewView: UIView {
     var session: AVCaptureSession
-    private var orientationManager = OrientationManager()
     
     // We can directly access the AVCaptureVideoPreviewLayer through the layer property
     override class var layerClass: AnyClass {
@@ -62,24 +60,11 @@ class CameraPreviewView: UIView {
         // Ensure the layer is configured to receive layout updates
         videoPreviewLayer.frame = bounds
         
-        // Set initial video orientation
-        updateVideoOrientation()
-    }
-    
-    // This updates the video orientation based on the current device orientation
-    func updateVideoOrientation() {
-        guard let connection = videoPreviewLayer.connection, connection.isVideoOrientationSupported else {
-            return
+        // IMPORTANT: Set video orientation to a fixed value (portrait)
+        // This prevents the preview from rotating with device orientation
+        if let connection = videoPreviewLayer.connection, connection.isVideoOrientationSupported {
+            connection.videoOrientation = .portrait
         }
-        
-        // Get the video orientation from the orientation manager
-        let videoOrientation = orientationManager.videoOrientation
-        
-        // Apply the orientation
-        connection.videoOrientation = videoOrientation
-        
-        // Force layout update
-        setNeedsLayout()
     }
     
     // Make sure our layer is always properly sized

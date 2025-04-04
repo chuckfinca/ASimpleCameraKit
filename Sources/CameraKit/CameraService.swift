@@ -3,61 +3,6 @@ import UIKit
 import Combine
 import SwiftUI
 
-/// Protocol defining the interface for a camera service
-public protocol CameraServiceProtocol {
-    /// The active capture session
-    var captureSession: AVCaptureSession { get }
-    
-    /// Publisher for the most recently captured image
-    var capturedImage: CurrentValueSubject<UIImage?, Never> { get }
-    
-    /// Publisher for the current device orientation
-    var deviceOrientation: CurrentValueSubject<UIDeviceOrientation, Never> { get }
-    
-    /// Publisher for the session running state
-    var isSessionRunning: CurrentValueSubject<Bool, Never> { get }
-    
-    /// Publisher for any errors that occur
-    var error: CurrentValueSubject<Error?, Never> { get }
-    
-    /// Orientation manager for orientation tracking
-    var orientationManager: OrientationManager { get }
-    
-    /// Checks camera permissions
-    /// - Returns: Whether camera access is authorized
-    func checkPermissions() async -> Bool
-    
-    /// Sets up the capture session
-    /// - Throws: CameraError if setup fails
-    func setupCaptureSession() async throws
-    
-    /// Starts the capture session
-    func startSession() async
-    
-    /// Stops the capture session
-    func stopSession() async
-    
-    /// Captures a photo
-    /// - Throws: CameraError if capture fails
-    func capturePhoto() async throws
-    
-    /// Captures a photo and automatically normalizes it
-    /// - Returns: Normalized UIImage with orientation set to .up
-    /// - Throws: CameraError if capture fails
-    func captureNormalizedPhoto() async throws -> UIImage
-    
-    /// Returns the current device orientation
-    /// - Returns: The current device orientation
-    func getCurrentOrientation() -> UIDeviceOrientation
-    
-    /// Creates an overlay that shows orientation information
-    /// - Parameters:
-    ///   - size: Size of the orientation guide
-    ///   - color: Color of the orientation guide
-    /// - Returns: An orientation guide view
-    func createOrientationGuide(size: CGFloat, color: Color) -> OrientationGuideView
-}
-
 /// A service that manages camera functionality
 public class CameraService: NSObject, CameraServiceProtocol, ObservableObject {
     // MARK: - Published Properties
@@ -225,19 +170,21 @@ public class CameraService: NSObject, CameraServiceProtocol, ObservableObject {
             self.continuations.append(continuation)
             
             // Store current device orientation from the orientation manager
-            self.deviceOrientation.send(self.orientationManager.captureOrientation)
+            let currentOrientation = self.orientationManager.captureOrientation
+            self.deviceOrientation.send(currentOrientation)
             
             // Set up photo settings
             let photoSettings = AVCapturePhotoSettings()
+            
+            // IMPORTANT: Unlike the preview, we DO want to respect the actual device orientation
+            // for photo capture to ensure we get the correct image orientation
             
             // Capture photo
             self.photoOutput.capturePhoto(with: photoSettings, delegate: self)
         }
     }
     
-    // MARK: - Enhanced API Methods
-    
-    /// Captures a photo and automatically normalizes it
+    /// Captures a photo and automatically normalizes it, ensuring proper orientation
     /// - Returns: Normalized UIImage with orientation set to .up
     /// - Throws: CameraError if capture fails
     public func captureNormalizedPhoto() async throws -> UIImage {
@@ -266,14 +213,14 @@ public class CameraService: NSObject, CameraServiceProtocol, ObservableObject {
             throw CameraError.photoCaptureFailed
         }
         
-        // Normalize the image
+        // Normalize the image - this is critical for handling the orientation
         guard let normalizedImage = imageNormalizer.normalizeImage(capturedImg) else {
             throw CameraError.photoCaptureFailed
         }
         
         return normalizedImage
     }
-    
+
     /// Returns the current device orientation
     /// - Returns: The current device orientation
     public func getCurrentOrientation() -> UIDeviceOrientation {

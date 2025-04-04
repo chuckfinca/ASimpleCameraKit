@@ -54,7 +54,7 @@ public struct CameraView<Content: View>: View {
                 // Black background
                 Color.black.edgesIgnoringSafeArea(.all)
                 
-                // Camera preview
+                // Camera preview - NOT wrapped in any rotation modifier
                 if viewModel.isSessionRunning {
                     ZStack {
                         CameraPreview(session: viewModel.captureSession)
@@ -63,8 +63,9 @@ public struct CameraView<Content: View>: View {
                     .edgesIgnoringSafeArea(.all)
                 }
                 
-                // UI Overlay
+                // UI Overlay - only the overlay elements adapt to orientation
                 cameraUIOverlay(geometry: geometry)
+                    .id(UIDevice.current.orientation) // Force refresh on orientation change
                 
                 // Custom overlay if provided
                 if let overlayContent = overlayContent {
@@ -162,21 +163,47 @@ public struct CameraView<Content: View>: View {
                 Spacer()
             }
             
-            // Capture button
-            VStack {
-                Spacer()
-                
-                CaptureButton(
-                    action: {
-                        // Use Task to call the async method
-                        Task {
-                            await viewModel.capturePhoto()
-                        }
-                    },
-                    disabled: viewModel.isCapturing,
-                    size: captureButtonSize
-                )
-                .padding(.bottom, 30)
+            // Capture button - positioned based on orientation
+            captureButtonPosition
+        }
+    }
+    
+    @ViewBuilder
+    private var captureButtonPosition: some View {
+        // Position the capture button based on current orientation
+        Group {
+            if UIDevice.current.orientation.isLandscape {
+                HStack {
+                    Spacer()
+                    VStack {
+                        Spacer()
+                        CaptureButton(
+                            action: {
+                                Task {
+                                    await viewModel.capturePhoto()
+                                }
+                            },
+                            disabled: viewModel.isCapturing,
+                            size: captureButtonSize
+                        )
+                        Spacer()
+                    }
+                    .padding(.trailing, 30)
+                }
+            } else {
+                VStack {
+                    Spacer()
+                    CaptureButton(
+                        action: {
+                            Task {
+                                await viewModel.capturePhoto()
+                            }
+                        },
+                        disabled: viewModel.isCapturing,
+                        size: captureButtonSize
+                    )
+                    .padding(.bottom, 30)
+                }
             }
         }
     }
