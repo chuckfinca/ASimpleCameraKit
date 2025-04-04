@@ -6,9 +6,6 @@ import Combine
 struct CameraPreview: UIViewRepresentable {
     let session: AVCaptureSession
     
-    // We'll use this to track the current device orientation
-    @State private var orientation = UIDevice.current.orientation
-    
     func makeUIView(context: Context) -> CameraPreviewView {
         print("CameraPreview - makeUIView called")
         
@@ -35,7 +32,7 @@ struct CameraPreview: UIViewRepresentable {
 // Custom UIView subclass that properly manages the AVCaptureVideoPreviewLayer
 class CameraPreviewView: UIView {
     var session: AVCaptureSession
-    private var orientationObserver: NSObjectProtocol?
+    private var orientationManager = OrientationManager()
     
     // We can directly access the AVCaptureVideoPreviewLayer through the layer property
     override class var layerClass: AnyClass {
@@ -51,17 +48,10 @@ class CameraPreviewView: UIView {
         super.init(frame: .zero)
         
         setupView()
-        setupOrientationObserver()
     }
     
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
-    }
-    
-    deinit {
-        if let observer = orientationObserver {
-            NotificationCenter.default.removeObserver(observer)
-        }
     }
     
     private func setupView() {
@@ -76,56 +66,14 @@ class CameraPreviewView: UIView {
         updateVideoOrientation()
     }
     
-    private func setupOrientationObserver() {
-        orientationObserver = NotificationCenter.default.addObserver(
-            forName: UIDevice.orientationDidChangeNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            self?.updateVideoOrientation()
-        }
-    }
-    
     // This updates the video orientation based on the current device orientation
-    // Add this property to track the previous valid orientation
-    private var lastValidOrientation: UIDeviceOrientation = .portrait
-    
     func updateVideoOrientation() {
         guard let connection = videoPreviewLayer.connection, connection.isVideoOrientationSupported else {
             return
         }
         
-        // Get current device orientation
-        let deviceOrientation = UIDevice.current.orientation
-        
-        // Determine which orientation to use
-        let orientationToUse: UIDeviceOrientation
-        
-        if deviceOrientation == .unknown || deviceOrientation == .faceUp || 
-           deviceOrientation == .faceDown {
-            // Use the last valid orientation for these invalid cases
-            orientationToUse = lastValidOrientation
-        } else if deviceOrientation == .portraitUpsideDown {
-            // For upside down, also use the last valid orientation
-            orientationToUse = lastValidOrientation
-        } else {
-            // This is a valid orientation - update our tracker and use it
-            lastValidOrientation = deviceOrientation
-            orientationToUse = deviceOrientation
-        }
-        
-        // Convert device orientation to video orientation
-        let videoOrientation: AVCaptureVideoOrientation
-        switch orientationToUse {
-        case .portrait:
-            videoOrientation = .portrait
-        case .landscapeLeft:
-            videoOrientation = .landscapeRight  // Note: This is reversed
-        case .landscapeRight:
-            videoOrientation = .landscapeLeft   // Note: This is reversed
-        default:
-            videoOrientation = .portrait        // Default
-        }
+        // Get the video orientation from the orientation manager
+        let videoOrientation = orientationManager.videoOrientation
         
         // Apply the orientation
         connection.videoOrientation = videoOrientation

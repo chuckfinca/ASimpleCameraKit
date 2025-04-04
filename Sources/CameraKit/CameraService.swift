@@ -1,6 +1,7 @@
 import AVFoundation
 import UIKit
 import Combine
+import SwiftUI
 
 /// Protocol defining the interface for a camera service
 public protocol CameraServiceProtocol {
@@ -19,6 +20,9 @@ public protocol CameraServiceProtocol {
     /// Publisher for any errors that occur
     var error: CurrentValueSubject<Error?, Never> { get }
     
+    /// Orientation manager for orientation tracking
+    var orientationManager: OrientationManager { get }
+    
     /// Checks camera permissions
     /// - Returns: Whether camera access is authorized
     func checkPermissions() async -> Bool
@@ -36,6 +40,22 @@ public protocol CameraServiceProtocol {
     /// Captures a photo
     /// - Throws: CameraError if capture fails
     func capturePhoto() async throws
+    
+    /// Captures a photo and automatically normalizes it
+    /// - Returns: Normalized UIImage with orientation set to .up
+    /// - Throws: CameraError if capture fails
+    func captureNormalizedPhoto() async throws -> UIImage
+    
+    /// Returns the current device orientation
+    /// - Returns: The current device orientation
+    func getCurrentOrientation() -> UIDeviceOrientation
+    
+    /// Creates an overlay that shows orientation information
+    /// - Parameters:
+    ///   - size: Size of the orientation guide
+    ///   - color: Color of the orientation guide
+    /// - Returns: An orientation guide view
+    func createOrientationGuide(size: CGFloat, color: Color) -> OrientationGuideView
 }
 
 /// A service that manages camera functionality
@@ -48,53 +68,42 @@ public class CameraService: NSObject, CameraServiceProtocol, ObservableObject {
     public let isSessionRunning = CurrentValueSubject<Bool, Never>(false)
     public let error = CurrentValueSubject<Error?, Never>(nil)
     
+    // MARK: - Orientation Management
+    
+    /// Orientation manager for tracking device orientation
+    public let orientationManager: OrientationManager
+    
     // MARK: - Private Properties
     
     private let photoOutput = AVCapturePhotoOutput()
     private var continuations = [CheckedContinuation<Void, Error>]()
+    private var imageNormalizer = ImageOrientationService.shared
     
     // MARK: - Initialization
     
     public override init() {
+        // Initialize orientation manager
+        self.orientationManager = OrientationManager()
+        
         super.init()
         
-        // Start monitoring device orientation
-        UIDevice.current.beginGeneratingDeviceOrientationNotifications()
-        
-        // Initialize with current orientation if valid, otherwise default to portrait
-        let currentOrientation = UIDevice.current.orientation
-        if currentOrientation.isPortrait || currentOrientation.isLandscape {
-            self.deviceOrientation.send(currentOrientation)
-        } else {
-            self.deviceOrientation.send(.portrait)
-        }
-        
-        // Set up orientation notification observation
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(orientationChanged),
-            name: UIDevice.orientationDidChangeNotification,
-            object: nil
-        )
+        // Subscribe to orientation changes from the manager
+        setupOrientationSubscription()
     }
     
-    deinit {
-        UIDevice.current.endGeneratingDeviceOrientationNotifications()
-        NotificationCenter.default.removeObserver(self)
-    }
-    
-    // MARK: - Orientation Handling
-    
-    @objc private func orientationChanged() {
-        let newOrientation = UIDevice.current.orientation
-        print("CameraService - Orientation changed to: \(newOrientation.rawValue)")
-            
-        // Only update for valid orientations (not face up/down)
-        if newOrientation != .faceUp && newOrientation != .faceDown && newOrientation != .unknown {
-            DispatchQueue.main.async { [weak self] in
+    private func setupOrientationSubscription() {
+        // Forward orientation updates from manager to the deviceOrientation subject
+        orientationManager.$currentOrientation
+            .sink { [weak self] newOrientation in
                 self?.deviceOrientation.send(newOrientation)
             }
-        }
+            .store(in: &cancellables)
+    }
+    
+    private var cancellables = Set<AnyCancellable>()
+    
+    deinit {
+        cancellables.forEach { $0.cancel() }
     }
     
     // MARK: - Camera Permissions
@@ -215,8 +224,8 @@ public class CameraService: NSObject, CameraServiceProtocol, ObservableObject {
             
             self.continuations.append(continuation)
             
-            // Store current device orientation
-            self.deviceOrientation.send(UIDevice.current.orientation)
+            // Store current device orientation from the orientation manager
+            self.deviceOrientation.send(self.orientationManager.captureOrientation)
             
             // Set up photo settings
             let photoSettings = AVCapturePhotoSettings()
@@ -224,6 +233,64 @@ public class CameraService: NSObject, CameraServiceProtocol, ObservableObject {
             // Capture photo
             self.photoOutput.capturePhoto(with: photoSettings, delegate: self)
         }
+    }
+    
+    // MARK: - Enhanced API Methods
+    
+    /// Captures a photo and automatically normalizes it
+    /// - Returns: Normalized UIImage with orientation set to .up
+    /// - Throws: CameraError if capture fails
+    public func captureNormalizedPhoto() async throws -> UIImage {
+        // Capture the photo first
+        try await capturePhoto()
+        
+        // Wait for the captured image to be set
+        guard let capturedImg = await withCheckedContinuation({ continuation in
+            // Check if image already exists
+            if let image = self.capturedImage.value {
+                continuation.resume(returning: image)
+                return
+            }
+            
+            // Otherwise set up a one-time observer
+            let cancellable = self.capturedImage
+                .compactMap { $0 }
+                .first()
+                .sink { image in
+                    continuation.resume(returning: image)
+                }
+            
+            // Store the cancellable to prevent it from being deallocated
+            self.cancellables.insert(cancellable)
+        }) else {
+            throw CameraError.photoCaptureFailed
+        }
+        
+        // Normalize the image
+        guard let normalizedImage = imageNormalizer.normalizeImage(capturedImg) else {
+            throw CameraError.photoCaptureFailed
+        }
+        
+        return normalizedImage
+    }
+    
+    /// Returns the current device orientation
+    /// - Returns: The current device orientation
+    public func getCurrentOrientation() -> UIDeviceOrientation {
+        return orientationManager.captureOrientation
+    }
+    
+    /// Creates an overlay that shows orientation information
+    /// - Parameters:
+    ///   - size: Size of the orientation guide
+    ///   - color: Color of the orientation guide
+    /// - Returns: An orientation guide view
+    public func createOrientationGuide(size: CGFloat = 50, color: Color = .white) -> OrientationGuideView {
+        return OrientationGuideView.ceilingIndicator(
+            orientationManager: orientationManager,
+            size: size,
+            color: color
+        )
     }
 }
 

@@ -27,6 +27,9 @@ class CameraViewModel: ObservableObject {
     /// The underlying camera service
     private let cameraService: CameraServiceProtocol
     
+    /// Orientation manager (can be injected)
+    private var orientationManager: OrientationManager?
+    
     /// Set of cancellables for Combine subscriptions
     private var cancellables = Set<AnyCancellable>()
     
@@ -45,6 +48,22 @@ class CameraViewModel: ObservableObject {
     init(cameraService: CameraServiceProtocol = CameraService()) {
         self.cameraService = cameraService
         setupBindings()
+    }
+    
+    // MARK: - Orientation Management
+    
+    /// Sets the orientation manager to use
+    /// - Parameter manager: The orientation manager
+    func setOrientationManager(_ manager: OrientationManager) {
+        self.orientationManager = manager
+        
+        // Subscribe to orientation changes
+        manager.$currentOrientation
+            .receive(on: RunLoop.main)
+            .sink { [weak self] newOrientation in
+                self?.orientation = newOrientation
+            }
+            .store(in: &cancellables)
     }
     
     // MARK: - Setup

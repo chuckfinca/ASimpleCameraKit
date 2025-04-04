@@ -16,8 +16,14 @@ public struct CameraView<Content: View>: View {
     /// Size of the capture button
     var captureButtonSize: CGFloat
     
+    /// Size of the orientation guide
+    var orientationGuideSize: CGFloat
+    
     /// View model for camera logic
     @StateObject private var viewModel = CameraViewModel()
+    
+    /// Orientation manager for tracking device orientation
+    @StateObject private var orientationManager = OrientationManager()
     
     // MARK: - Initialization
     
@@ -26,16 +32,19 @@ public struct CameraView<Content: View>: View {
     ///   - onImageCaptured: Callback when an image is captured
     ///   - onError: Optional callback when an error occurs
     ///   - captureButtonSize: Size of the capture button (default: 70)
+    ///   - orientationGuideSize: Size of the orientation guide (default: 50)
     ///   - overlayContent: Optional overlay content
     public init(
         onImageCaptured: @escaping (UIImage) -> Void,
         onError: ((Error) -> Void)? = nil,
         captureButtonSize: CGFloat = 70,
+        orientationGuideSize: CGFloat = 50,
         overlayContent: (() -> Content)? = nil
     ) {
         self.onImageCaptured = onImageCaptured
         self.onError = onError
         self.captureButtonSize = captureButtonSize
+        self.orientationGuideSize = orientationGuideSize
         self.overlayContent = overlayContent
     }
     
@@ -45,7 +54,7 @@ public struct CameraView<Content: View>: View {
                 // Black background
                 Color.black.edgesIgnoringSafeArea(.all)
                 
-                // Camera preview - use viewModel.isSessionRunning
+                // Camera preview
                 if viewModel.isSessionRunning {
                     ZStack {
                         CameraPreview(session: viewModel.captureSession)
@@ -75,6 +84,9 @@ public struct CameraView<Content: View>: View {
         .onAppear {
             print("CameraView - onAppear called")
             viewModel.onError = onError
+            
+            // Share the orientation manager with the view model
+            viewModel.setOrientationManager(orientationManager)
         }
         .onDisappear {
             print("CameraView - onDisappear called")
@@ -96,7 +108,14 @@ public struct CameraView<Content: View>: View {
         // Observe capturedImage updates
         .onChange(of: viewModel.capturedImage) { newImage in
             if let image = newImage {
-                onImageCaptured(image)
+                // Normalize the image
+                if let normalizedImage = ImageOrientationService.shared.normalizeImage(image) {
+                    onImageCaptured(normalizedImage)
+                } else {
+                    // Fallback to original if normalization fails
+                    onImageCaptured(image)
+                }
+                
                 // Clear the captured image to prepare for the next capture
                 viewModel.capturedImage = nil
             }
@@ -132,6 +151,16 @@ public struct CameraView<Content: View>: View {
     @ViewBuilder
     private func cameraUIOverlay(geometry: GeometryProxy) -> some View {
         ZStack {
+            // Orientation guide at the top
+            VStack {
+                OrientationGuideView.ceilingIndicator(
+                    orientationManager: orientationManager,
+                    size: orientationGuideSize
+                )
+                .padding(.top, 50)
+                
+                Spacer()
+            }
             
             // Capture button
             VStack {
@@ -158,12 +187,14 @@ public extension CameraView where Content == EmptyView {
     init(
         onImageCaptured: @escaping (UIImage) -> Void,
         onError: ((Error) -> Void)? = nil,
-        captureButtonSize: CGFloat = 70
+        captureButtonSize: CGFloat = 70,
+        orientationGuideSize: CGFloat = 50
     ) {
         self.init(
             onImageCaptured: onImageCaptured,
             onError: onError,
             captureButtonSize: captureButtonSize,
+            orientationGuideSize: orientationGuideSize,
             overlayContent: nil
         )
     }
