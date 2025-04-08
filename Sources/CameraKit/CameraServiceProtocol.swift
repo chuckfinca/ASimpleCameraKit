@@ -41,11 +41,6 @@ public protocol CameraServiceProtocol {
     /// - Throws: CameraError if capture fails
     func capturePhoto() async throws
     
-    /// Captures a photo and automatically normalizes it
-    /// - Returns: Normalized UIImage with orientation set to .up
-    /// - Throws: CameraError if capture fails
-    func captureNormalizedPhoto() async throws -> UIImage
-    
     /// Returns the current device orientation
     /// - Returns: The current device orientation
     func getCurrentOrientation() -> UIDeviceOrientation

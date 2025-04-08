@@ -128,31 +128,4 @@ public extension View {
             }
         }
     }
-    
-    /// Adds normalized image capture capability to a view
-    /// - Parameters:
-    ///   - cameraService: The camera service to use
-    ///   - isCapturing: Binding to track capture state
-    ///   - onImageCaptured: Action to perform with the captured and normalized image
-    /// - Returns: View with normalized image capture capability
-    func withNormalizedCapture(
-        cameraService: CameraServiceProtocol,
-        isCapturing: Binding<Bool>,
-        onImageCaptured: @escaping (UIImage) -> Void
-    ) -> some View {
-        return self.onChange(of: cameraService.capturedImage.value) { newImage in
-            if let image = newImage {
-                // Normalize the image
-                if let normalizedImage = ImageOrientationService.shared.normalizeImage(image) {
-                    onImageCaptured(normalizedImage)
-                } else {
-                    onImageCaptured(image) // Fallback to original if normalization fails
-                }
-                
-                // Reset the captured image
-                cameraService.capturedImage.send(nil)
-                isCapturing.wrappedValue = false
-            }
-        }
-    }
 }

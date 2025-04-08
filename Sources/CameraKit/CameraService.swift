@@ -22,7 +22,6 @@ public class CameraService: NSObject, CameraServiceProtocol, ObservableObject {
     
     private let photoOutput = AVCapturePhotoOutput()
     private var continuations = [CheckedContinuation<Void, Error>]()
-    private var imageNormalizer = ImageOrientationService.shared
     
     // MARK: - Initialization
     
@@ -182,43 +181,6 @@ public class CameraService: NSObject, CameraServiceProtocol, ObservableObject {
             // Capture photo
             self.photoOutput.capturePhoto(with: photoSettings, delegate: self)
         }
-    }
-    
-    /// Captures a photo and automatically normalizes it, ensuring proper orientation
-    /// - Returns: Normalized UIImage with orientation set to .up
-    /// - Throws: CameraError if capture fails
-    public func captureNormalizedPhoto() async throws -> UIImage {
-        // Capture the photo first
-        try await capturePhoto()
-        
-        // Wait for the captured image to be set
-        guard let capturedImg = await withCheckedContinuation({ continuation in
-            // Check if image already exists
-            if let image = self.capturedImage.value {
-                continuation.resume(returning: image)
-                return
-            }
-            
-            // Otherwise set up a one-time observer
-            let cancellable = self.capturedImage
-                .compactMap { $0 }
-                .first()
-                .sink { image in
-                    continuation.resume(returning: image)
-                }
-            
-            // Store the cancellable to prevent it from being deallocated
-            self.cancellables.insert(cancellable)
-        }) else {
-            throw CameraError.photoCaptureFailed
-        }
-        
-        // Normalize the image - this is critical for handling the orientation
-        guard let normalizedImage = imageNormalizer.normalizeImage(capturedImg) else {
-            throw CameraError.photoCaptureFailed
-        }
-        
-        return normalizedImage
     }
 
     /// Returns the current device orientation

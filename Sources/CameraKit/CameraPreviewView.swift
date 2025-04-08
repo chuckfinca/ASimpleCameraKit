@@ -62,7 +62,7 @@ class CameraPreviewView: UIView {
         if currentOrientation.isValidInterfaceOrientation {
             self.lastValidOrientation = currentOrientation
         } else {
-             // Fallback if initial state is faceup/down/unknown
+            // Fallback if initial state is faceup/down/unknown
             self.lastValidOrientation = .portrait
         }
         print("CameraPreviewView - Initial lastValidOrientation: \(self.lastValidOrientation.rawValue)")
@@ -90,6 +90,7 @@ class CameraPreviewView: UIView {
     }
 
     private func setupView() {
+
         backgroundColor = .black
         videoPreviewLayer.session = session
         videoPreviewLayer.videoGravity = .resizeAspectFill
@@ -138,11 +139,11 @@ class CameraPreviewView: UIView {
         // Treat unknown, faceUp, faceDown, AND portraitUpsideDown as cases
         // where we should stick to the last known valid *preview* orientation.
         if deviceOrientation == .unknown ||
-           deviceOrientation == .faceUp ||
-           deviceOrientation == .faceDown ||
-           deviceOrientation == .portraitUpsideDown { // <-- Includes portraitUpsideDown
+            deviceOrientation == .faceUp ||
+            deviceOrientation == .faceDown ||
+            deviceOrientation == .portraitUpsideDown { // <-- Includes portraitUpsideDown
 
-             // Use the last valid orientation for these ambiguous/ignored cases
+            // Use the last valid orientation for these ambiguous/ignored cases
             orientationToUse = lastValidOrientation
             // Only print if the ignored orientation is different from the one we're using
             // if deviceOrientation != orientationToUse {
@@ -165,21 +166,21 @@ class CameraPreviewView: UIView {
         // IMPORTANT: Landscape modes are reversed for the back camera preview.
         let targetVideoOrientation: AVCaptureVideoOrientation
         switch orientationToUse {
-            case .portrait:
-                targetVideoOrientation = .portrait
+        case .portrait:
+            targetVideoOrientation = .portrait
             // We should not hit .portraitUpsideDown here based on the logic above,
             // because orientationToUse would be lastValidOrientation instead.
             // So this case mapping is technically redundant for the *output* of this specific logic block.
-            case .portraitUpsideDown:
-                 targetVideoOrientation = .portraitUpsideDown // Maps UIDeviceOrientation -> AVCaptureVideoOrientation
-            case .landscapeLeft:
-                targetVideoOrientation = .landscapeRight  // Reversed for back camera sensor
-            case .landscapeRight:
-                targetVideoOrientation = .landscapeLeft   // Reversed for back camera sensor
+        case .portraitUpsideDown:
+            targetVideoOrientation = .portraitUpsideDown // Maps UIDeviceOrientation -> AVCaptureVideoOrientation
+        case .landscapeLeft:
+            targetVideoOrientation = .landscapeRight // Reversed for back camera sensor
+        case .landscapeRight:
+            targetVideoOrientation = .landscapeLeft // Reversed for back camera sensor
             // This case handles .unknown, .faceUp, .faceDown if they were the initial
             // value of lastValidOrientation, or potentially slipped through. Default to portrait.
-            default:
-                targetVideoOrientation = .portrait
+        default:
+            targetVideoOrientation = .portrait
         }
 
         // Apply the orientation ONLY if it has actually changed from the current state.
@@ -193,11 +194,11 @@ class CameraPreviewView: UIView {
             CATransaction.commit()
 
             // We might need to trigger layout after orientation change
-             setNeedsLayout() // Request layout update
+            setNeedsLayout() // Request layout update
         } else {
-             // print("CameraPreviewView - videoOrientation unchanged (\(targetVideoOrientation.rawValue))")
-             // Still might need layout if bounds changed even if orientation didn't
-             setNeedsLayout()
+            // print("CameraPreviewView - videoOrientation unchanged (\(targetVideoOrientation.rawValue))")
+            // Still might need layout if bounds changed even if orientation didn't
+            setNeedsLayout()
         }
     }
 
@@ -215,14 +216,14 @@ class CameraPreviewView: UIView {
             CATransaction.setDisableActions(true) // Prevent animation of the frame change
             // Only update if the frame is actually different
             if videoPreviewLayer.frame != bounds {
-                 // print("CameraPreviewView - layoutSubviews updating layer frame from \(videoPreviewLayer.frame) to \(bounds)")
+                // print("CameraPreviewView - layoutSubviews updating layer frame from \(videoPreviewLayer.frame) to \(bounds)")
                 videoPreviewLayer.frame = bounds
             } else {
-                 // print("CameraPreviewView - layoutSubviews frame unchanged: \(bounds)")
+                // print("CameraPreviewView - layoutSubviews frame unchanged: \(bounds)")
             }
             CATransaction.commit()
         } else {
-             // print("CameraPreviewView - layoutSubviews skipped due to zero bounds: \(bounds)")
+            // print("CameraPreviewView - layoutSubviews skipped due to zero bounds: \(bounds)")
         }
     }
 }
@@ -242,15 +243,15 @@ fileprivate extension UIDeviceOrientation {
 
 // Helper extension for mapping raw values (useful for debugging prints)
 #if DEBUG // Only include debug helpers in debug builds
-extension AVCaptureVideoOrientation {
-    var rawValue: String {
-        switch self {
-        case .portrait: return ".portrait"
-        case .portraitUpsideDown: return ".portraitUpsideDown"
-        case .landscapeRight: return ".landscapeRight"
-        case .landscapeLeft: return ".landscapeLeft"
-        @unknown default: return "unknown"
+    extension AVCaptureVideoOrientation {
+        var rawValue: String {
+            switch self {
+            case .portrait: return ".portrait"
+            case .portraitUpsideDown: return ".portraitUpsideDown"
+            case .landscapeRight: return ".landscapeRight"
+            case .landscapeLeft: return ".landscapeLeft"
+            @unknown default: return "unknown"
+            }
         }
     }
-}
 #endif

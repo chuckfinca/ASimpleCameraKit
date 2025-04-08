@@ -4,7 +4,7 @@ import SwiftUI
 public enum CameraKit {
     /// Creates a configured camera view with orientation guide and capture button
     /// - Parameters:
-    ///   - onImageCaptured: Callback for when an image is captured and normalized
+    ///   - onImageCaptured: Callback for when an image is captured
     ///   - onError: Optional callback for errors
     ///   - captureButtonSize: Size of the capture button
     ///   - orientationGuideSize: Size of the orientation guide
@@ -53,12 +53,5 @@ public enum CameraKit {
     /// - Returns: A new camera service
     public static func createCameraService() -> CameraServiceProtocol {
         return CameraService()
-    }
-    
-    /// Normalizes an image's orientation
-    /// - Parameter image: The image to normalize
-    /// - Returns: A normalized copy of the image, or nil if normalization fails
-    public static func normalizeImage(_ image: UIImage) -> UIImage? {
-        return ImageOrientationService.shared.normalizeImage(image)
     }
 }
