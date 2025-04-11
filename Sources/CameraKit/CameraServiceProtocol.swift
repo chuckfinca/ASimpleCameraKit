@@ -44,11 +44,4 @@ public protocol CameraServiceProtocol {
     /// Returns the current device orientation
     /// - Returns: The current device orientation
     func getCurrentOrientation() -> UIDeviceOrientation
-    
-    /// Creates an overlay that shows orientation information
-    /// - Parameters:
-    ///   - size: Size of the orientation guide
-    ///   - color: Color of the orientation guide
-    /// - Returns: An orientation guide view
-    func createOrientationGuide(size: CGFloat, color: Color) -> OrientationGuideView
 }

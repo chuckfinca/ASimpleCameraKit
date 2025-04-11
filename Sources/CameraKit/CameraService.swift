@@ -215,19 +215,6 @@ public class CameraService: NSObject, CameraServiceProtocol, ObservableObject {
     public func getCurrentOrientation() -> UIDeviceOrientation {
         return orientationManager.captureOrientation
     }
-
-    /// Creates an overlay that shows orientation information
-    /// - Parameters:
-    ///   - size: Size of the orientation guide
-    ///   - color: Color of the orientation guide
-    /// - Returns: An orientation guide view
-    public func createOrientationGuide(size: CGFloat = 50, color: Color = .white) -> OrientationGuideView {
-        return OrientationGuideView.ceilingIndicator(
-            orientationManager: orientationManager,
-            size: size,
-            color: color
-        )
-    }
 }
 
 // MARK: - AVCapturePhotoCaptureDelegate
