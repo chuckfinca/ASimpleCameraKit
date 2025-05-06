@@ -31,6 +31,9 @@ public protocol CameraServiceProtocol {
     /// - Throws: CameraError if setup fails
     func setupCaptureSession() async throws
     
+    /// Clears the captured image
+    func clearCapturedImage()
+    
     /// Starts the capture session
     func startSession() async
     

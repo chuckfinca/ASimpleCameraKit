@@ -210,6 +210,11 @@ public class CameraService: NSObject, CameraServiceProtocol, ObservableObject {
         }
     }
 
+    public func clearCapturedImage() {
+        capturedImage.send(nil)
+        print("CameraService: Cleared capturedImage.") 
+    }
+
     /// Returns the current device orientation
     /// - Returns: The current device orientation
     public func getCurrentOrientation() -> UIDeviceOrientation {
