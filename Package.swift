@@ -4,22 +4,22 @@
 import PackageDescription
 
 let package = Package(
-    name: "CameraKit",
+    name: "ASimpleCameraKit",
     platforms: [
         .iOS(.v16)
     ],
     products: [
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
-            name: "CameraKit",
-            targets: ["CameraKit"]),
+            name: "ASimpleCameraKit",
+            targets: ["ASimpleCameraKit"]),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
         .target(
-            name: "CameraKit"),
+            name: "ASimpleCameraKit"),
         .testTarget(
-            name: "CameraKitTests",
-            dependencies: ["CameraKit"]),
+            name: "ASimpleCameraKitTests",
+            dependencies: ["ASimpleCameraKit"]),
     ]
 )

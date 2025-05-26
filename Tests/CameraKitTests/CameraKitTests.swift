@@ -1,7 +1,7 @@
 import XCTest
-@testable import CameraKit
+@testable import ASimpleCameraKit
 
-final class CameraKitTests: XCTestCase {
+final class ASimpleCameraKitTests: XCTestCase {
     func testExample() throws {
         // XCTest Documentation
         // https://developer.apple.com/documentation/xctest
