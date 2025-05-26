@@ -66,7 +66,7 @@ public extension View {
     ///   - error: The error to display
     ///   - retryAction: Optional action to perform when retry is tapped
     /// - Returns: A view with the error alert attached
-    func errorAlert(isPresented: Binding<Bool>, error: Error?, retryAction: (() -> Void)? = nil) -> some View {
+    func cameraErrorAlert(isPresented: Binding<Bool>, error: Error?, retryAction: (() -> Void)? = nil) -> some View {
         self.modifier(ErrorAlert(isPresented: isPresented, error: error, retryAction: retryAction))
     }
 }
