@@ -1,6 +1,6 @@
 import SwiftUI
 import Combine
-import CoreMotion // Import the Core Motion framework
+import CoreMotion
 import AVFoundation
 
 /// Centralized manager for device orientation tracking using Core Motion for robustness.
