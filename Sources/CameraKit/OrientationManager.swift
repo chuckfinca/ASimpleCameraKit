@@ -8,6 +8,9 @@ public class OrientationManager: ObservableObject {
     // MARK: - Published Properties
     @Published public private(set) var currentOrientation: UIDeviceOrientation = .portrait
     @Published public private(set) var lastValidOrientation: UIDeviceOrientation = .portrait
+    
+    // ADDED: A new publisher for the continuous rotation angle.
+    @Published public private(set) var continuousAngle: Angle = .zero
 
     // MARK: - Private Properties
     private let motionManager = CMMotionManager()
@@ -33,24 +36,33 @@ public class OrientationManager: ObservableObject {
             return
         }
 
-        motionManager.accelerometerUpdateInterval = 0.5
+        motionManager.accelerometerUpdateInterval = 0.1 // Increase update frequency for smoother rotation
         print("✅ OrientationManager: Starting Core Motion updates.")
 
         motionManager.startAccelerometerUpdates(to: queue) { [weak self] (data, error) in
             guard let self = self, let data = data else { return }
-
-            // --- LOGGING THE RAW DATA ---
-            print(String(format: "➡️ OrientationManager RAW DATA: x: %.2f, y: %.2f, z: %.2f", data.acceleration.x, data.acceleration.y, data.acceleration.z))
-
+            
+            // --- LOGGING THE RAW DATA (optional) ---
+            // print(String(format: "➡️ OrientationManager RAW DATA: x: %.2f, y: %.2f, z: %.2f", data.acceleration.x, data.acceleration.y, data.acceleration.z))
+            
+            // --- DISCRETE ORIENTATION LOGIC (Existing) ---
             let newOrientation = self.orientation(from: data.acceleration)
 
+            // --- CONTINUOUS ANGLE LOGIC (New) ---
+            // Calculate the angle using atan2. We use x and -y to map correctly to SwiftUI's coordinate space.
+            let angleInRadians = -atan2(data.acceleration.x, -data.acceleration.y)
+            let newContinuousAngle = Angle(radians: angleInRadians)
+            
             DispatchQueue.main.async {
+                // --- Update discrete orientation ---
                 self.currentOrientation = newOrientation
                 if newOrientation.isValidForCapture && self.lastValidOrientation != newOrientation {
-                    // --- LOGGING THE UPDATE ---
-                    print("✅ OrientationManager: >>> Publishing new valid orientation: \(newOrientation.name)")
+                    print("✅ OrientationManager: >>> Publishing new valid discrete orientation: \(newOrientation.name)")
                     self.lastValidOrientation = newOrientation
                 }
+                
+                // --- Update continuous angle ---
+                self.continuousAngle = newContinuousAngle
             }
         }
     }
@@ -71,7 +83,7 @@ public class OrientationManager: ObservableObject {
     }
 }
 
-// MARK: - UIDeviceOrientation & AVCaptureVideoOrientation Extensions
+// MARK: - UIDeviceOrientation & AVCaptureVideoOrientation Extensions (No changes needed here)
 
 public extension UIDeviceOrientation {
     var isValidForCapture: Bool {
@@ -103,7 +115,6 @@ public extension UIDeviceOrientation {
         }
     }
     
-    // Helper for cleaner logging
     var name: String {
         switch self {
         case .unknown: return "unknown"
@@ -123,8 +134,8 @@ public extension AVCaptureVideoOrientation {
         switch deviceOrientation {
         case .portrait: self = .portrait
         case .portraitUpsideDown: self = .portraitUpsideDown
-        case .landscapeRight: self = .landscapeLeft // Note the mapping is reversed for the back camera
-        case .landscapeLeft: self = .landscapeRight // Note the mapping is reversed for the back camera
+        case .landscapeRight: self = .landscapeLeft
+        case .landscapeLeft: self = .landscapeRight
         default: return nil
         }
     }

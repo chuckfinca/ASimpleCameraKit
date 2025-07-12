@@ -10,7 +10,7 @@ import SwiftUI
 // A UIViewRepresentable that hosts a SwiftUI view and applies a CGAffineTransform for rotation.
 struct RotatableContainerView<Content: View>: UIViewRepresentable {
     @ViewBuilder let content: () -> Content
-    let orientation: UIDeviceOrientation
+    let angle: Angle
 
     func makeUIView(context: Context) -> UIView {
         return UIView()
@@ -32,10 +32,9 @@ struct RotatableContainerView<Content: View>: UIViewRepresentable {
             ])
         }
 
-        let angle = orientation.rotationAngle
         let transform = CGAffineTransform(rotationAngle: angle.radians)
         
-        UIView.animate(withDuration: 0.3, delay: 0, options: .curveEaseInOut) {
+        UIView.animate(withDuration: 0.2, delay: 0, options: .curveEaseInOut) {
             uiView.transform = transform
         }
     }

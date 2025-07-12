@@ -8,18 +8,38 @@
 import SwiftUI
 import ASimpleCameraKit
 
+// ADDED: An enum to define the rotation behavior.
+public enum RotationStyle {
+    /// Rotates in discrete 90-degree steps.
+    case discrete
+    /// Rotates smoothly and continuously with the device.
+    case continuous
+}
+
 // The ViewModifier that observes orientation and wraps the content in our rotatable container.
 struct RotatesWithDevice: ViewModifier {
-    // The modifier holds the state for the current orientation.
-    @State private var currentOrientation: UIDeviceOrientation = .portrait
+    // MODIFIED: This now holds the target angle, not the orientation.
+    @State private var currentAngle: Angle = .zero
+    
     // A reference to the single source of truth for orientation.
     let orientationManager: OrientationManager
+    // ADDED: The rotation style to use.
+    let style: RotationStyle
 
+    @ViewBuilder
     func body(content: Content) -> some View {
-        RotatableContainerView(content: { content }, orientation: currentOrientation)
-        // Listen for updates from the manager and update the local state.
-        .onReceive(orientationManager.$lastValidOrientation) { newOrientation in
-            self.currentOrientation = newOrientation
+        // The container now receives the angle directly.
+        let view = RotatableContainerView(content: { content }, angle: currentAngle)
+        
+        // MODIFIED: Conditionally subscribe to the correct publisher based on the style.
+        if style == .continuous {
+            view.onReceive(orientationManager.$continuousAngle) { newAngle in
+                self.currentAngle = newAngle
+            }
+        } else {
+            view.onReceive(orientationManager.$lastValidOrientation) { newOrientation in
+                self.currentAngle = newOrientation.rotationAngle
+            }
         }
     }
 }
@@ -28,9 +48,11 @@ extension View {
     /// Applies a view modifier that rotates the view to match the physical device orientation,
     /// while the parent view remains locked in portrait.
     ///
-    /// - Parameter orientationManager: The app's central `OrientationManager`.
+    /// - Parameters:
+    ///   - orientationManager: The app's central `OrientationManager`.
+    ///   - style: The rotation behavior. Defaults to `.discrete` (90-degree steps).
     /// - Returns: A view that animates its rotation based on device orientation.
-    public func rotatesWithDevice(orientationManager: OrientationManager) -> some View {
-        self.modifier(RotatesWithDevice(orientationManager: orientationManager))
+    public func rotatesWithDevice(orientationManager: OrientationManager, style: RotationStyle = .discrete) -> some View {
+        self.modifier(RotatesWithDevice(orientationManager: orientationManager, style: style))
     }
 }
