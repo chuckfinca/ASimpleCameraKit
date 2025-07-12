@@ -1,155 +1,131 @@
 import SwiftUI
 import Combine
+import CoreMotion // Import the Core Motion framework
 import AVFoundation
 
-/// Centralized manager for device orientation tracking and management
+/// Centralized manager for device orientation tracking using Core Motion for robustness.
 public class OrientationManager: ObservableObject {
     // MARK: - Published Properties
-    
-    /// Current device orientation
-    @Published public private(set) var currentOrientation: UIDeviceOrientation
-    
-    /// Whether the current orientation is valid (not unknown, faceUp, or faceDown)
-    @Published public private(set) var isValidOrientation: Bool = true
-    
-    /// Most recent valid orientation (excludes unknown, faceUp, faceDown)
-    @Published public private(set) var lastValidOrientation: UIDeviceOrientation
-    
+    @Published public private(set) var currentOrientation: UIDeviceOrientation = .portrait
+    @Published public private(set) var lastValidOrientation: UIDeviceOrientation = .portrait
+
     // MARK: - Private Properties
-    
-    private var orientationObserver: NSObjectProtocol?
-    private var cancellables = Set<AnyCancellable>()
-    
+    private let motionManager = CMMotionManager()
+    private let queue = OperationQueue()
+
     // MARK: - Initialization
-    
-    /// Creates a new orientation manager
     public init() {
-        // Initialize with current orientation
-        let deviceOrientation = UIDevice.current.orientation
-        
-        // Handle initial orientation
-        if deviceOrientation.isValidForCapture {
-            self.currentOrientation = deviceOrientation
-            self.lastValidOrientation = deviceOrientation
-        } else {
-            // Default to portrait if the initial orientation is invalid
-            self.currentOrientation = deviceOrientation
-            self.lastValidOrientation = .portrait
-            self.isValidOrientation = false
-        }
-        
-        setupOrientationTracking()
+        print("✅ OrientationManager: Initialized.")
+        startTracking()
     }
-    
+
     deinit {
-        if let observer = orientationObserver {
-            NotificationCenter.default.removeObserver(observer)
-        }
-        UIDevice.current.endGeneratingDeviceOrientationNotifications()
+        stopTracking()
     }
-    
+
     // MARK: - Public Methods
-    
-    /// Returns the current capture orientation, using lastValidOrientation if current is invalid
-    public var captureOrientation: UIDeviceOrientation {
-        return currentOrientation.isValidForCapture ? currentOrientation : lastValidOrientation
-    }
-    
-    /// Returns the AVCaptureVideoOrientation for the current device orientation
-    public var videoOrientation: AVCaptureVideoOrientation {
-        return ImageOrientationService.shared.videoOrientationFrom(deviceOrientation: captureOrientation)
-    }
-    
-    /// Start orientation tracking (automatically called during initialization)
+    public var captureOrientation: UIDeviceOrientation { lastValidOrientation }
+    public var videoOrientation: AVCaptureVideoOrientation { AVCaptureVideoOrientation(deviceOrientation: captureOrientation) ?? .portrait }
+
     public func startTracking() {
-        UIDevice.current.beginGeneratingDeviceOrientationNotifications()
+        guard motionManager.isAccelerometerAvailable else {
+            print("🛑 OrientationManager ERROR: Accelerometer is not available.")
+            return
+        }
+
+        motionManager.accelerometerUpdateInterval = 0.5
+        print("✅ OrientationManager: Starting Core Motion updates.")
+
+        motionManager.startAccelerometerUpdates(to: queue) { [weak self] (data, error) in
+            guard let self = self, let data = data else { return }
+
+            // --- LOGGING THE RAW DATA ---
+            print(String(format: "➡️ OrientationManager RAW DATA: x: %.2f, y: %.2f, z: %.2f", data.acceleration.x, data.acceleration.y, data.acceleration.z))
+
+            let newOrientation = self.orientation(from: data.acceleration)
+
+            DispatchQueue.main.async {
+                self.currentOrientation = newOrientation
+                if newOrientation.isValidForCapture && self.lastValidOrientation != newOrientation {
+                    // --- LOGGING THE UPDATE ---
+                    print("✅ OrientationManager: >>> Publishing new valid orientation: \(newOrientation.name)")
+                    self.lastValidOrientation = newOrientation
+                }
+            }
+        }
     }
-    
-    /// Stop orientation tracking
+
     public func stopTracking() {
-        UIDevice.current.endGeneratingDeviceOrientationNotifications()
+        print("✅ OrientationManager: Stopping Core Motion updates.")
+        motionManager.stopAccelerometerUpdates()
     }
-    
+
     // MARK: - Private Methods
-    
-    private func setupOrientationTracking() {
-        // Start generating notifications
-        UIDevice.current.beginGeneratingDeviceOrientationNotifications()
-        
-        // Set up notification observer
-        orientationObserver = NotificationCenter.default.addObserver(
-            forName: UIDevice.orientationDidChangeNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            self?.handleOrientationChange()
-        }
-    }
-    
-    private func handleOrientationChange() {
-        let newOrientation = UIDevice.current.orientation
-        
-        // Update current orientation regardless of validity
-        currentOrientation = newOrientation
-        
-        // Check if the orientation is valid for capture
-        isValidOrientation = newOrientation.isValidForCapture
-        
-        // Update the last valid orientation if appropriate
-        if newOrientation.isValidForCapture {
-            lastValidOrientation = newOrientation
-        }
+    private func orientation(from acceleration: CMAcceleration) -> UIDeviceOrientation {
+        if abs(acceleration.z) > 0.8 { return acceleration.z < 0 ? .faceUp : .faceDown }
+        if acceleration.y < -0.6 { return .portrait }
+        if acceleration.y > 0.6 { return .portraitUpsideDown }
+        if acceleration.x < -0.6 { return .landscapeLeft }
+        if acceleration.x > 0.6 { return .landscapeRight }
+        return .unknown
     }
 }
 
-// MARK: - UIDeviceOrientation Extensions
+// MARK: - UIDeviceOrientation & AVCaptureVideoOrientation Extensions
 
 public extension UIDeviceOrientation {
-    /// Returns whether this orientation is valid for capture (not unknown, faceUp, or faceDown)
     var isValidForCapture: Bool {
         switch self {
         case .portrait, .portraitUpsideDown, .landscapeLeft, .landscapeRight:
             return true
-        case .unknown, .faceUp, .faceDown:
-            return false
-        @unknown default:
+        default:
             return false
         }
     }
-    
-    /// Returns the rotation angle needed to display content properly in this orientation
+
     var rotationAngle: Angle {
         switch self {
-        case .portrait:
-            return .degrees(0)
-        case .portraitUpsideDown:
-            return .degrees(180)
-        case .landscapeLeft:
-            return .degrees(90)
-        case .landscapeRight:
-            return .degrees(-90)
-        case .faceUp, .faceDown, .unknown:
-            return .degrees(0)
-        @unknown default:
-            return .degrees(0)
+        case .portrait: return .degrees(0)
+        case .portraitUpsideDown: return .degrees(180)
+        case .landscapeLeft: return .degrees(90)
+        case .landscapeRight: return .degrees(-90)
+        default: return .degrees(0)
+        }
+    }
+
+    var counterRotationAngle: Angle {
+        switch self {
+        case .portrait: return .degrees(0)
+        case .portraitUpsideDown: return .degrees(-180)
+        case .landscapeLeft: return .degrees(-90)
+        case .landscapeRight: return .degrees(90)
+        default: return .degrees(0)
         }
     }
     
-    /// Returns the inverse rotation needed to counteract the UI rotation
-    var counterRotationAngle: Angle {
+    // Helper for cleaner logging
+    var name: String {
         switch self {
-        case .portrait:
-            return .degrees(0)
-        case .portraitUpsideDown:
-            return .degrees(-180)
-        case .landscapeLeft:
-            return .degrees(-90)
-        case .landscapeRight:
-            return .degrees(90)
-        case .faceUp, .faceDown, .unknown:
-            return .degrees(0)
-        @unknown default:
-            return .degrees(0)
+        case .unknown: return "unknown"
+        case .portrait: return "portrait"
+        case .portraitUpsideDown: return "portraitUpsideDown"
+        case .landscapeLeft: return "landscapeLeft"
+        case .landscapeRight: return "landscapeRight"
+        case .faceUp: return "faceUp"
+        case .faceDown: return "faceDown"
+        @unknown default: return "default"
+        }
+    }
+}
+
+public extension AVCaptureVideoOrientation {
+    init?(deviceOrientation: UIDeviceOrientation) {
+        switch deviceOrientation {
+        case .portrait: self = .portrait
+        case .portraitUpsideDown: self = .portraitUpsideDown
+        case .landscapeRight: self = .landscapeLeft // Note the mapping is reversed for the back camera
+        case .landscapeLeft: self = .landscapeRight // Note the mapping is reversed for the back camera
+        default: return nil
         }
     }
 }
