@@ -26,13 +26,21 @@ public class CameraService: NSObject, CameraServiceProtocol, ObservableObject {
     // MARK: - Initialization
 
     public override init() {
-        // Initialize orientation manager
         self.orientationManager = OrientationManager()
-
         super.init()
-
-        // Subscribe to orientation changes from the manager
         setupOrientationSubscription()
+
+        // Kick off the one-time session setup when the service is created.
+        Task {
+            do {
+                try await self.setupCaptureSession()
+            } catch {
+                // If initial setup fails, publish the error.
+                // The app can decide how to handle a non-functional camera.
+                self.error.send(error)
+                print("FATAL: CameraService failed to initialize capture session: \(error.localizedDescription)")
+            }
+        }
     }
 
     private func setupOrientationSubscription() {
@@ -70,53 +78,49 @@ public class CameraService: NSObject, CameraServiceProtocol, ObservableObject {
     // MARK: - Session Setup
 
     public func setupCaptureSession() async throws {
-        // Clear session if already configured
-        if captureSession.isRunning {
-            await stopSession()
+        // Permission must be checked before setup
+        guard await checkPermissions() else {
+            throw CameraError.accessDenied
         }
 
-        if captureSession.inputs.isEmpty == false {
-            captureSession.inputs.forEach { captureSession.removeInput($0) }
+        guard !captureSession.isRunning else {
+            print("CameraService setup called, but session is already running. Ignoring.")
+            return
         }
 
-        if captureSession.outputs.isEmpty == false {
-            captureSession.outputs.forEach { captureSession.removeOutput($0) }
+        // No need to tear down, this should only run once.
+        guard captureSession.inputs.isEmpty else {
+            print("CameraService setup called, but inputs already exist. Ignoring.")
+            return
         }
 
-        // Check and get the video device
         guard let videoDevice = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else {
             throw CameraError.cameraUnavailable
         }
 
-        // Create video device input
         do {
             let videoInput = try AVCaptureDeviceInput(device: videoDevice)
-
-            // Configure autofocus if available
             if videoDevice.isFocusModeSupported(.continuousAutoFocus) {
                 try videoDevice.lockForConfiguration()
                 videoDevice.focusMode = .continuousAutoFocus
                 videoDevice.unlockForConfiguration()
             }
 
-            // Begin session configuration
             captureSession.beginConfiguration()
-
-            // Add inputs and outputs
             if captureSession.canAddInput(videoInput) {
                 captureSession.addInput(videoInput)
             } else {
+                captureSession.commitConfiguration()
                 throw CameraError.cannotAddInput
             }
-
             if captureSession.canAddOutput(photoOutput) {
                 captureSession.addOutput(photoOutput)
             } else {
+                captureSession.commitConfiguration()
                 throw CameraError.cannotAddOutput
             }
-
             captureSession.commitConfiguration()
-
+            print("✅ CameraService: Capture session configured successfully.")
         } catch {
             throw error
         }
@@ -212,7 +216,7 @@ public class CameraService: NSObject, CameraServiceProtocol, ObservableObject {
 
     public func clearCapturedImage() {
         capturedImage.send(nil)
-        print("CameraService: Cleared capturedImage.") 
+        print("CameraService: Cleared capturedImage.")
     }
 
     /// Returns the current device orientation

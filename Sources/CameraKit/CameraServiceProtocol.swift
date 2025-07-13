@@ -27,10 +27,6 @@ public protocol CameraServiceProtocol {
     /// - Returns: Whether camera access is authorized
     func checkPermissions() async -> Bool
     
-    /// Sets up the capture session
-    /// - Throws: CameraError if setup fails
-    func setupCaptureSession() async throws
-    
     /// Clears the captured image
     func clearCapturedImage()
     
