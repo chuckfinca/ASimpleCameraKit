@@ -41,13 +41,13 @@ public class OrientationManager: ObservableObject {
         motionManager.startAccelerometerUpdates(to: queue) { [weak self] (data, error) in
             guard let self = self, let data = data else { return }
 
-            // --- LOGGING THE RAW DATA (optional) ---
+            // --- LOGGING THE RAW DATA ---
             // print(String(format: "➡️ OrientationManager RAW DATA: x: %.2f, y: %.2f, z: %.2f", data.acceleration.x, data.acceleration.y, data.acceleration.z))
 
-            // --- DISCRETE ORIENTATION LOGIC (Existing) ---
+            // --- DISCRETE ORIENTATION LOGIC ---
             let newOrientation = self.orientation(from: data.acceleration)
 
-            // --- CONTINUOUS ANGLE LOGIC (New) ---
+            // --- CONTINUOUS ANGLE LOGIC ---
             // Calculate the angle using atan2. We use x and -y to map correctly to SwiftUI's coordinate space.
             let angleInRadians = -atan2(data.acceleration.x, -data.acceleration.y)
 
@@ -81,7 +81,7 @@ public class OrientationManager: ObservableObject {
     }
 }
 
-// MARK: - UIDeviceOrientation & AVCaptureVideoOrientation Extensions (No changes needed here)
+// MARK: - UIDeviceOrientation & AVCaptureVideoOrientation Extensions
 
 public extension UIDeviceOrientation {
     var isValidForCapture: Bool {

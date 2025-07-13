@@ -83,7 +83,6 @@ public class CameraService: NSObject, CameraServiceProtocol, ObservableObject {
             throw CameraError.accessDenied
         }
 
-        // The rest of this method is mostly correct, but let's ensure it's safe.
         guard !captureSession.isRunning else {
             print("CameraService setup called, but session is already running. Ignoring.")
             return
