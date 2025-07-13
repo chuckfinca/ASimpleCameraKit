@@ -13,11 +13,21 @@ let package = Package(
         .library(
             name: "ASimpleCameraKit",
             targets: ["ASimpleCameraKit"]),
+        .library(
+            name: "ASimpleCameraKitUI",
+            targets: ["ASimpleCameraKitUI"]),
     ],
     targets: [
-        // Targets are the basic building blocks of a package, defining a module or a test suite.
         .target(
-            name: "ASimpleCameraKit"),
+            name: "ASimpleCameraKit",
+            path: "Sources/CameraKit",
+            exclude: ["UI"]),
+            
+        .target(
+            name: "ASimpleCameraKitUI",
+            dependencies: ["ASimpleCameraKit"],
+            path: "Sources/CameraKit/UI"),
+                
         .testTarget(
             name: "ASimpleCameraKitTests",
             dependencies: ["ASimpleCameraKit"]),

@@ -1,4 +1,5 @@
 import SwiftUI
+import ASimpleCameraKit
 
 /// A view that displays a loading spinner with a message
 public struct LoadingOverlay: View {

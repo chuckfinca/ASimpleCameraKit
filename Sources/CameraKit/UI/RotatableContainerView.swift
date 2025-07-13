@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import ASimpleCameraKit
 
 // A UIViewRepresentable that hosts a SwiftUI view and applies a CGAffineTransform for rotation.
 struct RotatableContainerView<Content: View>: UIViewRepresentable {
