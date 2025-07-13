@@ -8,9 +8,8 @@ public class OrientationManager: ObservableObject {
     // MARK: - Published Properties
     @Published public private(set) var currentOrientation: UIDeviceOrientation = .portrait
     @Published public private(set) var lastValidOrientation: UIDeviceOrientation = .portrait
-    
-    // ADDED: A new publisher for the continuous rotation angle.
-    @Published public private(set) var continuousAngle: Angle = .zero
+
+    @Published public private(set) var continuousAngleRadians: Double = 0.0
 
     // MARK: - Private Properties
     private let motionManager = CMMotionManager()
@@ -41,18 +40,17 @@ public class OrientationManager: ObservableObject {
 
         motionManager.startAccelerometerUpdates(to: queue) { [weak self] (data, error) in
             guard let self = self, let data = data else { return }
-            
+
             // --- LOGGING THE RAW DATA (optional) ---
             // print(String(format: "➡️ OrientationManager RAW DATA: x: %.2f, y: %.2f, z: %.2f", data.acceleration.x, data.acceleration.y, data.acceleration.z))
-            
+
             // --- DISCRETE ORIENTATION LOGIC (Existing) ---
             let newOrientation = self.orientation(from: data.acceleration)
 
             // --- CONTINUOUS ANGLE LOGIC (New) ---
             // Calculate the angle using atan2. We use x and -y to map correctly to SwiftUI's coordinate space.
             let angleInRadians = -atan2(data.acceleration.x, -data.acceleration.y)
-            let newContinuousAngle = Angle(radians: angleInRadians)
-            
+
             DispatchQueue.main.async {
                 // --- Update discrete orientation ---
                 self.currentOrientation = newOrientation
@@ -60,9 +58,9 @@ public class OrientationManager: ObservableObject {
                     print("✅ OrientationManager: >>> Publishing new valid discrete orientation: \(newOrientation.name)")
                     self.lastValidOrientation = newOrientation
                 }
-                
+
                 // --- Update continuous angle ---
-                self.continuousAngle = newContinuousAngle
+                self.continuousAngleRadians = angleInRadians
             }
         }
     }
@@ -95,13 +93,18 @@ public extension UIDeviceOrientation {
         }
     }
 
+    /// Returns the rotation angle as a SwiftUI `Angle`.
     var rotationAngle: Angle {
+        return Angle(radians: Double(self.rotationAngleRadians))
+    }
+
+    var rotationAngleRadians: CGFloat {
         switch self {
-        case .portrait: return .degrees(0)
-        case .portraitUpsideDown: return .degrees(180)
-        case .landscapeLeft: return .degrees(90)
-        case .landscapeRight: return .degrees(-90)
-        default: return .degrees(0)
+        case .portrait: return 0
+        case .portraitUpsideDown: return .pi
+        case .landscapeLeft: return .pi / 2
+        case .landscapeRight: return -.pi / 2
+        default: return 0
         }
     }
 
@@ -114,7 +117,7 @@ public extension UIDeviceOrientation {
         default: return .degrees(0)
         }
     }
-    
+
     var name: String {
         switch self {
         case .unknown: return "unknown"
