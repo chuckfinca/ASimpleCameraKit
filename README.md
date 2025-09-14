@@ -103,7 +103,12 @@ struct CameraView: View {
             }
         }
         .task {
-            await cameraService.startSession()
+            do {
+                try await cameraService.prepareSession()
+                await cameraService.startSession()
+            } catch {
+                showingError = true
+            }
         }
         .cameraErrorAlert(
             isPresented: $showingError,
@@ -218,7 +223,12 @@ struct MyCameraView: View {
             }
         }
         .task {
-            await cameraService.startSession()
+            do {
+                try await cameraService.prepareSession()
+                await cameraService.startSession()
+            } catch {
+                // Handle setup errors
+            }
         }
     }
 }
@@ -269,7 +279,7 @@ struct CameraViewWithCustomErrors: View {
             Button("OK") { }
             Button("Retry") {
                 Task {
-                    try? await cameraService.setupCaptureSession()
+                    try? await cameraService.prepareSession()
                     await cameraService.startSession()
                 }
             }
@@ -322,7 +332,12 @@ struct CameraLifecycleView: View {
                     if isSessionRunning {
                         await cameraService.stopSession()
                     } else {
-                        await cameraService.startSession()
+                        do {
+                            try await cameraService.prepareSession()
+                            await cameraService.startSession()
+                        } catch {
+                            // Handle errors
+                        }
                     }
                 }
             }
@@ -352,6 +367,7 @@ The main service class that manages camera operations.
 #### Methods
 
 - `checkPermissions() async -> Bool` - Check camera permissions
+- `prepareSession() async throws` - Setup camera session with permission checking
 - `startSession() async` - Start the camera session
 - `stopSession() async` - Stop the camera session
 - `capturePhoto() async throws` - Capture a photo
@@ -366,13 +382,13 @@ Manages device orientation using Core Motion for accuracy.
 
 - `currentOrientation: UIDeviceOrientation` - Current device orientation
 - `lastValidOrientation: UIDeviceOrientation` - Last valid capture orientation
-- `continuousAngle: Angle` - Continuous rotation angle for smooth animations
+- `continuousAngleRadians: Double` - Continuous rotation angle in radians for smooth animations
 - `captureOrientation: UIDeviceOrientation` - Orientation to use for photo capture
 - `videoOrientation: AVCaptureVideoOrientation` - Video orientation for AVFoundation
 
 #### Methods
 
-- `startTracking()` - Start orientation tracking
+- `startTracking()` - Start orientation tracking (called automatically)
 - `stopTracking()` - Stop orientation tracking
 
 ### CameraError
@@ -388,20 +404,27 @@ Enumeration of possible camera errors.
 
 ## Best Practices
 
-1. **Always check permissions** before starting the camera session
+1. **Use prepareSession()** before starting the camera session - it handles permissions and setup
 2. **Handle errors gracefully** using the provided error types and alert modifier
 3. **Use orientation manager** from camera service for consistent orientation handling
 4. **Stop sessions** when the camera view disappears to save battery
 5. **Clear captured images** when no longer needed to free memory
 
-## License
+## 🤝 Contributing
 
-[Add your license information here]
+1. **Fork the repository**
+2. **Create a feature branch**: `git checkout -b feature/amazing-feature`
+3. **Run tests**: `tests/`
+5. **Commit changes**: `git commit -m 'Add amazing feature'`
+6. **Push to branch**: `git push origin feature/amazing-feature`
+7. **Open a Pull Request**
 
-## Contributing
+## 📄 License
 
-[Add contribution guidelines here]
+MIT License - see [LICENSE](LICENSE) file for details.
 
-## Support
+## 🆘 Support
 
-[Add support information here]
+- **Documentation**: Check the inline code documentation
+- **Issues**: Open GitHub issues for bugs and feature requests
+- **Discussions**: Use GitHub Discussions for questions and ideas

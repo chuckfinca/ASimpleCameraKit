@@ -44,7 +44,7 @@ public struct LoadingOverlay: View {
 #if DEBUG
 struct LoadingOverlay_Previews: PreviewProvider {
     static var previews: some View {
-        LoadingOverlay(message: "Scanning card...")
+        LoadingOverlay(message: "Extracting Contact Information...")
     }
 }
 #endif

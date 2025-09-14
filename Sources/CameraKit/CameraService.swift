@@ -29,18 +29,6 @@ public class CameraService: NSObject, CameraServiceProtocol, ObservableObject {
         self.orientationManager = OrientationManager()
         super.init()
         setupOrientationSubscription()
-
-        // Kick off the one-time session setup when the service is created.
-        Task {
-            do {
-                try await self.setupCaptureSession()
-            } catch {
-                // If initial setup fails, publish the error.
-                // The app can decide how to handle a non-functional camera.
-                self.error.send(error)
-                print("FATAL: CameraService failed to initialize capture session: \(error.localizedDescription)")
-            }
-        }
     }
 
     private func setupOrientationSubscription() {
@@ -77,12 +65,18 @@ public class CameraService: NSObject, CameraServiceProtocol, ObservableObject {
 
     // MARK: - Session Setup
 
-    public func setupCaptureSession() async throws {
-        // Permission must be checked before setup
+    /// A unified public method to prepare the camera.
+    /// This is the recommended way to get the camera ready.
+    public func prepareSession() async throws {
         guard await checkPermissions() else {
             throw CameraError.accessDenied
         }
 
+        try await setupCaptureSession()
+    }
+
+
+    private func setupCaptureSession() async throws {
         guard !captureSession.isRunning else {
             print("CameraService setup called, but session is already running. Ignoring.")
             return
