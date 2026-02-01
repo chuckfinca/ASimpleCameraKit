@@ -43,4 +43,7 @@ public protocol CameraServiceProtocol {
     /// Returns the current device orientation
     /// - Returns: The current device orientation
     func getCurrentOrientation() -> UIDeviceOrientation
+
+    /// Focuses the camera at the given point in the preview layer's coordinate space
+    func focus(at point: CGPoint, in previewLayer: AVCaptureVideoPreviewLayer)
 }

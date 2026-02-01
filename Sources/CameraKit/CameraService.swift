@@ -208,6 +208,30 @@ public class CameraService: NSObject, CameraServiceProtocol, ObservableObject {
         }
     }
 
+    public func focus(at point: CGPoint, in previewLayer: AVCaptureVideoPreviewLayer) {
+        let devicePoint = previewLayer.captureDevicePointConverted(fromLayerPoint: point)
+
+        guard let device = (captureSession.inputs.first as? AVCaptureDeviceInput)?.device else { return }
+
+        do {
+            try device.lockForConfiguration()
+
+            if device.isFocusPointOfInterestSupported && device.isFocusModeSupported(.autoFocus) {
+                device.focusPointOfInterest = devicePoint
+                device.focusMode = .autoFocus
+            }
+
+            if device.isExposurePointOfInterestSupported && device.isExposureModeSupported(.autoExpose) {
+                device.exposurePointOfInterest = devicePoint
+                device.exposureMode = .autoExpose
+            }
+
+            device.unlockForConfiguration()
+        } catch {
+            print("CameraService: Could not lock device for focus configuration: \(error)")
+        }
+    }
+
     public func clearCapturedImage() {
         capturedImage.send(nil)
         print("CameraService: Cleared capturedImage.")
